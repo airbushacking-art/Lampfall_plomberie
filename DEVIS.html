@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Gestion Devis / Factures - Lamp fall plomberie sanitaire</title>
+
+<!-- Librairies PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f4f7f6;
+  margin: 0;
+  padding: 10px;
+}
+h1 {
+  text-align: center;
+  color: #007a33;
+  font-size: 1.5em;
+}
+.container {
+  width: 100%;
+  max-width: 900px;
+  background: #fff;
+  padding: 15px;
+  margin: auto;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #ccc;
+  box-sizing: border-box;
+}
+input, select, textarea {
+  width: 100%;
+  padding: 8px;
+  margin: 6px 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+button {
+  background: #007a33;
+  color: white;
+  border: none;
+  padding: 10px 14px;
+  margin: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+button:hover {
+  background: #005a25;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+th, td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+th {
+  background: #007a33;
+  color: white;
+}
+#devisList div {
+  background: #e9f5ee;
+  padding: 10px;
+  margin: 8px 0;
+  border-radius: 6px;
+}
+.total {
+  text-align: right;
+  font-weight: bold;
+  margin-top: 10px;
+  font-size: 16px;
+}
+.footer {
+  text-align: center;
+  font-size: 12px;
+  color: #555;
+  border-top: 1px solid #ccc;
+  margin-top: 40px;
+  padding-top: 10px;
+}
+.signature {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+}
+.signature div {
+  text-align: center;
+  width: 45%;
+}
+.signature-line {
+  margin-top: 50px;
+  border-top: 1px solid #000;
+  width: 80%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ✅ Adaptation mobile */
+@media screen and (max-width: 600px) {
+  .container {
+    padding: 10px;
+  }
+  table, th, td {
+    font-size: 12px;
+  }
+  .signature {
+    flex-direction: column;
+    align-items: center;
+  }
+  .signature div {
+    width: 100%;
+    margin-top: 20px;
+  }
+}
+</style>
+</head>
+<body>
+
+<h1>Gestion des Devis et Factures - Lamp fall plomberie sanitaire</h1>
+
+<div class="container">
+  <div id="header" style="text-align:center;">
+    <!-- ✅ Logo changé en "saliou" -->
+    <img src="saliou.png" alt="Logo saliou" style="max-width:120px; margin-bottom:10px;">
+    <h2 id="companyName">Lamp fall plomberie sanitaire</h2>
+    <p id="companyInfo">Onze Novembre<br>Tel: 76 657 57 02</p>
+  </div>
+
+  <label>Type de document :</label>
+  <select id="docType">
+    <option value="devis">Devis</option>
+    <option value="facture">Facture</option>
+  </select>
+
+  <label>Nom du client :</label>
+  <input type="text" id="client" placeholder="Nom du client">
+
+  <label>Date :</label>
+  <input type="date" id="date">
+
+  <h3>Détails</h3>
+  <table id="itemsTable">
+    <thead>
+      <tr><th>Désignation</th><th>Qté</th><th>Prix Unitaire</th><th>Total</th><th>Action</th></tr>
+    </thead>
+    <tbody id="itemsBody"></tbody>
+  </table>
+  <button onclick="addRow()">➕ Ajouter une ligne</button>
+
+  <div class="total">Total général : <span id="grandTotal">0</span> FCFA</div>
+
+  <button onclick="saveDoc()">💾 Enregistrer</button>
+</div>
+
+<h2 style="text-align:center;margin-top:30px;">📋 Liste des documents enregistrés</h2>
+<div id="devisList" class="container"></div>
+
+<script>
+function addRow(){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" class="designation" placeholder="Désignation"></td>
+    <td><input type="number" class="qty" value="1" min="1" onchange="calculateTotal()"></td>
+    <td><input type="number" class="price" value="0" min="0" onchange="calculateTotal()"></td>
+    <td class="lineTotal">0</td>
+    <td><button onclick="removeRow(this)">🗑️</button></td>`;
+  document.getElementById('itemsBody').appendChild(tr);
+  calculateTotal();
+}
+
+function removeRow(btn){
+  btn.closest('tr').remove();
+  calculateTotal();
+}
+
+function calculateTotal(){
+  let total = 0;
+  document.querySelectorAll('#itemsBody tr').forEach(row=>{
+    const q = parseFloat(row.querySelector('.qty').value)||0;
+    const p = parseFloat(row.querySelector('.price').value)||0;
+    const t = q*p;
+    row.querySelector('.lineTotal').textContent = t.toFixed(0);
+    total += t;
+  });
+  document.getElementById('grandTotal').textContent = total.toFixed(0);
+  return total;
+}
+
+function saveDoc(){
+  const client = document.getElementById('client').value.trim();
+  const type = document.getElementById('docType').value;
+  if(!client){ alert("Veuillez saisir le nom du client."); return; }
+
+  const date = document.getElementById('date').value;
+  const items = [];
+  document.querySelectorAll('#itemsBody tr').forEach(row=>{
+    items.push({
+      designation: row.querySelector('.designation').value,
+      qty: row.querySelector('.qty').value,
+      price: row.querySelector('.price').value
+    });
+  });
+  const doc = { id: Date.now(), type, client, date, items, total: calculateTotal() };
+  let data = JSON.parse(localStorage.getItem('docsList')||'[]');
+  data.push(doc);
+  localStorage.setItem('docsList', JSON.stringify(data));
+  alert("✅ " + (type === 'facture' ? "Facture" : "Devis") + " enregistré avec succès !");
+  loadList();
+}
+
+function loadList(){
+  const list = document.getElementById('devisList');
+  list.innerHTML = '';
+  const data = JSON.parse(localStorage.getItem('docsList')||'[]');
+  if(data.length===0){ list.innerHTML = "<p>Aucun document enregistré.</p>"; return; }
+
+  data.forEach(d=>{
+    const div = document.createElement('div');
+    div.innerHTML = `
+      <b>Type :</b> ${d.type.toUpperCase()}<br>
+      <b>Client :</b> ${d.client}<br>
+      <b>Date :</b> ${d.date}<br>
+      <b>Total :</b> ${d.total} FCFA<br>
+      <button onclick="printDoc(${d.id})">🖨️ Imprimer</button>
+      <button onclick="downloadPDF(${d.id})">📥 Télécharger PDF</button>
+      <button onclick="deleteDoc(${d.id})" style="background:#c00;">❌ Supprimer</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+function deleteDoc(id){
+  if(!confirm("Supprimer ce document ?")) return;
+  let data = JSON.parse(localStorage.getItem('docsList')||'[]');
+  data = data.filter(d=>d.id!==id);
+  localStorage.setItem('docsList', JSON.stringify(data));
+  loadList();
+}
+
+function printDoc(id){
+  const data = JSON.parse(localStorage.getItem('docsList')||'[]');
+  const doc = data.find(d=>d.id===id);
+  if(!doc) return;
+  const titre = doc.type === 'facture' ? "FACTURE" : "DEVIS";
+
+  const w = window.open('', '_blank');
+  w.document.write(`
+  <html><head><title>${titre} - ${doc.client}</title></head><body>
+    <div style="text-align:center;">
+      <img src="saliou.png" alt="Logo saliou" style="max-width:120px;margin-bottom:10px;">
+      <h2 style="color:#007a33;">Lamp fall plomberie sanitaire</h2>
+      <p>Onze Novembre<br>Tel: 76 657 57 02</p>
+    </div>
+    <h3 style="text-align:center;">${titre} pour ${doc.client}</h3>
+    <p>Date : ${doc.date}</p>
+    <table border="1" style="width:100%;border-collapse:collapse;text-align:center;">
+      <tr><th>Désignation</th><th>Qté</th><th>Prix</th><th>Total</th></tr>
+      ${doc.items.map(it=>`
+        <tr><td>${it.designation}</td><td>${it.qty}</td><td>${it.price}</td><td>${it.qty*it.price}</td></tr>`).join('')}
+    </table>
+    <h3 style="text-align:right;">Total : ${doc.total} FCFA</h3>
+    <div class="signature" style="display:flex;justify-content:space-between;margin-top:50px;">
+      <div style="text-align:center;width:45%;">
+        <div class="signature-line"></div>
+        <p>Signature Client</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <div class="signature-line"></div>
+        <p>Signature Responsable</p>
+      </div>
+    </div>
+    <div class="footer" style="text-align:center;font-size:12px;margin-top:40px;border-top:1px solid #ccc;padding-top:10px;">
+      Lamp fall plomberie sanitaire - Onze Novembre | Tel: 76 657 57 02<br>
+      © 2025 Lamp fall plomberie sanitaire. Tous droits réservés.
+    </div>
+  </body></html>`);
+  w.print();
+}
+
+async function downloadPDF(id){
+  const data = JSON.parse(localStorage.getItem('docsList')||'[]');
+  const doc = data.find(d=>d.id===id);
+  if(!doc) return;
+  const titre = doc.type === 'facture' ? "FACTURE" : "DEVIS";
+
+  const pdfDiv = document.createElement('div');
+  pdfDiv.style.width = '700px';
+  pdfDiv.style.padding = '20px';
+  pdfDiv.style.background = '#fff';
+  pdfDiv.innerHTML = `
+    <div style="text-align:center;">
+      <img src="saliou.png" alt="Logo saliou" style="max-width:120px;margin-bottom:10px;">
+      <h2 style="color:#007a33;">Lamp fall plomberie sanitaire</h2>
+      <p>Onze Novembre<br>Tel: 76 657 57 02</p>
+    </div>
+    <h3 style="text-align:center;">${titre} pour ${doc.client}</h3>
+    <p>Date : ${doc.date}</p>
+    <table border="1" style="width:100%;border-collapse:collapse;text-align:center;">
+      <tr><th>Désignation</th><th>Qté</th><th>Prix</th><th>Total</th></tr>
+      ${doc.items.map(it=>`
+        <tr><td>${it.designation}</td><td>${it.qty}</td><td>${it.price}</td><td>${it.qty*it.price}</td></tr>`).join('')}
+    </table>
+    <h3 style="text-align:right;">Total : ${doc.total} FCFA</h3>
+    <div style="display:flex;justify-content:space-between;margin-top:50px;">
+      <div style="text-align:center;width:45%;">
+        <div style="border-top:1px solid #000;margin-top:40px;width:80%;margin:auto;"></div>
+        <p>Signature Client</p>
+      </div>
+      <div style="text-align:center;width:45%;">
+        <div style="border-top:1px solid #000;margin-top:40px;width:80%;margin:auto;"></div>
+        <p>Signature Responsable</p>
+      </div>
+    </div>
+    <div style="text-align:center;font-size:12px;margin-top:40px;border-top:1px solid #ccc;padding-top:10px;color:#555;">
+      Lamp fall plomberie sanitaire - Onze Novembre | Tel: 76 657 57 02<br>
+      © 2025 Lamp fall plomberie sanitaire. Tous droits réservés.
+    </div>
+  `;
+
+  document.body.appendChild(pdfDiv);
+  const canvas = await html2canvas(pdfDiv, { scale: 2 });
+  const img = canvas.toDataURL('image/png');
+  const pdf = new jspdf.jsPDF('p', 'pt', 'a4');
+  const width = pdf.internal.pageSize.getWidth();
+  const height = canvas.height * width / canvas.width;
+  pdf.addImage(img, 'PNG', 0, 0, width, height);
+  pdf.save(`${titre}_${doc.client}.pdf`);
+  pdfDiv.remove();
+}
+
+window.onload = function(){
+  document.getElementById('date').valueAsDate = new Date();
+  addRow();
+  loadList();
+};
+</script>
+
+</body>
+</html>
